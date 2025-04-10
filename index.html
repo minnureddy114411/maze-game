@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Maze Game</title>
+  <style>
+    canvas {
+      background-color: #222;
+      display: block;
+      margin: 0 auto;
+      touch-action: none;
+    }
+  </style>
+</head>
+<body>
+<canvas id="gameCanvas" width="400" height="400"></canvas>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+
+const tileSize = 40;
+const rows = 10;
+const cols = 10;
+
+let player = { x: 0, y: 0 };
+const goal = { x: 360, y: 360 };
+
+// Maze layout: 0 = path, 1 = wall
+const maze = [
+  [0,1,0,0,0,1,0,0,0,0],
+  [0,1,0,1,0,1,0,1,1,0],
+  [0,0,0,1,0,0,0,0,1,0],
+  [1,1,1,1,1,1,1,0,1,0],
+  [0,0,0,0,0,0,1,0,1,0],
+  [0,1,1,1,1,0,1,0,1,0],
+  [0,0,0,0,1,0,1,0,0,0],
+  [0,1,1,0,1,0,1,1,1,0],
+  [0,0,0,0,1,0,0,0,0,0],
+  [1,1,1,0,1,1,1,1,1,0],
+];
+
+function drawMaze() {
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      ctx.fillStyle = maze[row][col] === 1 ? "#888" : "#111";
+      ctx.fillRect(col * tileSize, row * tileSize, tileSize, tileSize);
+    }
+  }
+}
+
+function drawPlayer() {
+  ctx.fillStyle = "lime";
+  ctx.fillRect(player.x, player.y, tileSize, tileSize);
+}
+
+function drawGoal() {
+  ctx.fillStyle = "gold";
+  ctx.fillRect(goal.x, goal.y, tileSize, tileSize);
+}
+
+function canMove(x, y) {
+  const col = x / tileSize;
+  const row = y / tileSize;
+  return maze[row] && maze[row][col] === 0;
+}
+
+function movePlayer(dx, dy) {
+  const newX = player.x + dx;
+  const newY = player.y + dy;
+
+  if (canMove(newX, newY)) {
+    player.x = newX;
+    player.y = newY;
+  }
+
+  if (player.x === goal.x && player.y === goal.y) {
+    setTimeout(() => alert("🎉 You Win!"), 50);
+  }
+}
+
+document.addEventListener("keydown", (e) => {
+  switch (e.key) {
+    case "ArrowUp": movePlayer(0, -tileSize); break;
+    case "ArrowDown": movePlayer(0, tileSize); break;
+    case "ArrowLeft": movePlayer(-tileSize, 0); break;
+    case "ArrowRight": movePlayer(tileSize, 0); break;
+  }
+  draw();
+});
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawMaze();
+  drawGoal();
+  drawPlayer();
+}
+
+draw();
+</script>
+</body>
+</html>
