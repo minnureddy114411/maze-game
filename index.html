@@ -4,16 +4,51 @@
   <meta charset="UTF-8">
   <title>Maze Game</title>
   <style>
-    canvas {
-      background-color: #222;
-      display: block;
-      margin: 0 auto;
-      touch-action: none;
+    body { margin: 0; background: #000; }
+    canvas { display: block; margin: auto; background: url('https://i.imgur.com/0Q9UMjv.png'); background-size: cover; }
+    #controls {
+      display: flex;
+      justify-content: center;
+      flex-wrap: wrap;
+      margin-top: 10px;
+    }
+    .btn {
+      background: rgba(255, 255, 255, 0.2);
+      color: white;
+      font-size: 24px;
+      padding: 10px 20px;
+      margin: 5px;
+      border: none;
+      border-radius: 10px;
+    }
+    .btn:active { background: rgba(255, 255, 255, 0.4); }
+    #levelScreen {
+      position: absolute;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: rgba(0,0,0,0.9);
+      color: white;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      font-size: 24px;
+      display: none;
     }
   </style>
 </head>
 <body>
 <canvas id="gameCanvas" width="400" height="400"></canvas>
+<div id="controls">
+  <button class="btn" onclick="move('up')">⬆</button><br>
+  <button class="btn" onclick="move('left')">⬅</button>
+  <button class="btn" onclick="move('down')">⬇</button>
+  <button class="btn" onclick="move('right')">➡</button>
+</div>
+<div id="levelScreen">
+  <div id="levelText">Level Complete!</div>
+  <button onclick="nextLevel()" class="btn">Next Level</button>
+</div>
 
 <script>
 const canvas = document.getElementById("gameCanvas");
@@ -22,36 +57,58 @@ const ctx = canvas.getContext("2d");
 const tileSize = 40;
 const rows = 10;
 const cols = 10;
+const totalLevels = 10;
 
-let player = { x: 0, y: 0 };
+let playerImg = new Image();
+playerImg.src = 'https://i.imgur.com/w5jO0fZ.png'; // character sprite
+
+let moveSound = new Audio('https://www.fesliyanstudios.com/play-mp3/387');
+let winSound = new Audio('https://www.fesliyanstudios.com/play-mp3/6670');
+let bgMusic = new Audio('https://www.fesliyanstudios.com/play-mp3/6979');
+bgMusic.loop = true;
+bgMusic.volume = 0.4;
+bgMusic.play();
+
+let currentLevel = 0;
+let score = 0;
+let timer = 60;
+let interval;
+
+const player = { x: 0, y: 0 };
 const goal = { x: 360, y: 360 };
 
-// Maze layout: 0 = path, 1 = wall
-const maze = [
-  [0,1,0,0,0,1,0,0,0,0],
-  [0,1,0,1,0,1,0,1,1,0],
-  [0,0,0,1,0,0,0,0,1,0],
-  [1,1,1,1,1,1,1,0,1,0],
-  [0,0,0,0,0,0,1,0,1,0],
-  [0,1,1,1,1,0,1,0,1,0],
-  [0,0,0,0,1,0,1,0,0,0],
-  [0,1,1,0,1,0,1,1,1,0],
-  [0,0,0,0,1,0,0,0,0,0],
-  [1,1,1,0,1,1,1,1,1,0],
-];
+const levelScreen = document.getElementById("levelScreen");
+const levelText = document.getElementById("levelText");
 
-function drawMaze() {
+const mazes = Array(totalLevels).fill().map(() => generateMaze());
+
+function generateMaze() {
+  // For simplicity, use a static maze layout for all levels
+  return [
+    [0,1,0,0,0,1,0,0,0,0],
+    [0,1,0,1,0,1,0,1,1,0],
+    [0,0,0,1,0,0,0,0,1,0],
+    [1,1,1,1,1,1,1,0,1,0],
+    [0,0,0,0,0,0,1,0,1,0],
+    [0,1,1,1,1,0,1,0,1,0],
+    [0,0,0,0,1,0,1,0,0,0],
+    [0,1,1,0,1,0,1,1,1,0],
+    [0,0,0,0,1,0,0,0,0,0],
+    [1,1,1,0,1,1,1,1,1,0],
+  ];
+}
+
+function drawMaze(maze) {
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
-      ctx.fillStyle = maze[row][col] === 1 ? "#888" : "#111";
+      ctx.fillStyle = maze[row][col] === 1 ? "#666" : "#000";
       ctx.fillRect(col * tileSize, row * tileSize, tileSize, tileSize);
     }
   }
 }
 
 function drawPlayer() {
-  ctx.fillStyle = "lime";
-  ctx.fillRect(player.x, player.y, tileSize, tileSize);
+  ctx.drawImage(playerImg, player.x, player.y, tileSize, tileSize);
 }
 
 function drawGoal() {
@@ -59,7 +116,7 @@ function drawGoal() {
   ctx.fillRect(goal.x, goal.y, tileSize, tileSize);
 }
 
-function canMove(x, y) {
+function canMove(x, y, maze) {
   const col = x / tileSize;
   const row = y / tileSize;
   return maze[row] && maze[row][col] === 0;
@@ -69,34 +126,76 @@ function movePlayer(dx, dy) {
   const newX = player.x + dx;
   const newY = player.y + dy;
 
-  if (canMove(newX, newY)) {
+  if (canMove(newX, newY, mazes[currentLevel])) {
     player.x = newX;
     player.y = newY;
+    moveSound.play();
   }
 
   if (player.x === goal.x && player.y === goal.y) {
-    setTimeout(() => alert("🎉 You Win!"), 50);
-  }
-}
-
-document.addEventListener("keydown", (e) => {
-  switch (e.key) {
-    case "ArrowUp": movePlayer(0, -tileSize); break;
-    case "ArrowDown": movePlayer(0, tileSize); break;
-    case "ArrowLeft": movePlayer(-tileSize, 0); break;
-    case "ArrowRight": movePlayer(tileSize, 0); break;
+    winSound.play();
+    clearInterval(interval);
+    levelScreen.style.display = "flex";
+    score += timer;
+    localStorage.setItem("mazeHighScore", Math.max(score, getHighScore()));
   }
   draw();
-});
+}
 
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  drawMaze();
+  drawMaze(mazes[currentLevel]);
   drawGoal();
   drawPlayer();
 }
 
-draw();
+function move(dir) {
+  switch (dir) {
+    case 'up': movePlayer(0, -tileSize); break;
+    case 'down': movePlayer(0, tileSize); break;
+    case 'left': movePlayer(-tileSize, 0); break;
+    case 'right': movePlayer(tileSize, 0); break;
+  }
+}
+
+document.addEventListener("keydown", (e) => {
+  if (e.key === "ArrowUp") move("up");
+  if (e.key === "ArrowDown") move("down");
+  if (e.key === "ArrowLeft") move("left");
+  if (e.key === "ArrowRight") move("right");
+});
+
+function startLevel() {
+  player.x = 0;
+  player.y = 0;
+  timer = 60;
+  draw();
+  interval = setInterval(() => {
+    timer--;
+    if (timer <= 0) {
+      clearInterval(interval);
+      alert("⏰ Time's up! Game Over\nHigh Score: " + getHighScore());
+      location.reload();
+    }
+  }, 1000);
+}
+
+function nextLevel() {
+  currentLevel++;
+  if (currentLevel >= totalLevels) {
+    alert("🎉 Game Finished!\nYour Score: " + score + "\nHigh Score: " + getHighScore());
+    location.reload();
+  } else {
+    levelScreen.style.display = "none";
+    startLevel();
+  }
+}
+
+function getHighScore() {
+  return parseInt(localStorage.getItem("mazeHighScore") || 0);
+}
+
+startLevel();
 </script>
 </body>
 </html>
